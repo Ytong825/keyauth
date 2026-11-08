@@ -1,0 +1,27 @@
+# KeyAuth
+#
+#   docker compose up -d --build
+#
+# 端口只绑 127.0.0.1，公网访问一律走宿主机 Nginx 反代。
+# 注意：Docker 的端口映射会绕过 ufw，所以这里必须写 127.0.0.1，
+#       改成 "8787:8787" 等于把服务直接暴露到公网。
+
+services:
+  keyauth:
+    build: .
+    image: keyauth:latest
+    container_name: keyauth
+    restart: unless-stopped
+    environment:
+      KEYAUTH_DATA: /data
+      PORT: "8787"
+      BIND: 0.0.0.0
+    volumes:
+      - ./data:/data
+    ports:
+      - "127.0.0.1:8787:8787"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

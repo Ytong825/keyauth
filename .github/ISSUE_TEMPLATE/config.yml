@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 部署和使用问题
+    url: https://github.com/Ytong825/keyauth/blob/main/docs/FAQ.md
+    about: 先看常见问题，80% 的问题在里面
+  - name: 安全漏洞
+    url: https://github.com/Ytong825/keyauth/blob/main/SECURITY.md
+    about: 不要开公开 issue，按这里的方式私下报告

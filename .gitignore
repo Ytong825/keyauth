@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+
+# 运行时数据（绝不能进版本库：含管理令牌和数据库）
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# 测试临时目录
+_testdata/
+_smoke/
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log

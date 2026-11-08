@@ -1,0 +1,23 @@
+# 统一编辑器行为，避免行尾和缩进在不同人机器上打架
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{html,css,js,json,yml,yaml,md}]
+indent_size = 2
+
+[*.md]
+# 中文段落里的行尾空格有时是有意的换行，别自动删
+trim_trailing_whitespace = false
+
+[*.{bat,cmd}]
+end_of_line = crlf
+
+[Makefile]
+indent_style = tab

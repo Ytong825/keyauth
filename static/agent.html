@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>代理商制卡台 · KeyAuth</title>
+<link rel="stylesheet" href="/app.css" />
+<link rel="icon" href="/favicon.svg" />
+<style>
+  body { background: var(--bg); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 22px 20px 60px; }
+  .agent-top {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; margin-bottom: 16px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r); box-shadow: var(--shadow);
+  }
+  .agent-top .who { font-weight: 600; }
+  .agent-top .meta { font-size: 12.5px; color: var(--text-3); }
+  .badge-left {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 9px; border-radius: 999px; font-size: 12px;
+    background: var(--primary-soft); color: var(--primary-2);
+  }
+  .gen-out { display: none; }
+  .gen-out.on { display: block; }
+  .no-del { font-size: 12px; color: var(--text-3); }
+  .pwd-box { max-width: 380px; margin: 8vh auto 0; }
+  .pwd-box .card { padding: 26px 24px; }
+  .pwd-box h1 { font-size: 19px; margin: 0 0 4px; }
+  .pwd-box .sub { font-size: 12.5px; color: var(--text-3); margin: 0 0 18px; }
+  .pwd-box .field { margin-bottom: 12px; }
+  .pwd-box .btn { width: 100%; justify-content: center; margin-top: 4px; }
+  .err { color: var(--danger); font-size: 12.5px; min-height: 18px; margin: 6px 0 0; }
+  .quota-hint { font-size: 12.5px; color: var(--text-3); margin: 8px 0 0; }
+</style>
+</head>
+<body>
+
+<!-- 登录 -->
+<div class="wrap" id="loginView">
+  <div class="pwd-box">
+    <div class="card">
+      <h1>代理商制卡台</h1>
+      <p class="sub">用管理员给你的账号登录。忘记密码找上级管理员重置。</p>
+      <div class="field"><label>账号</label><input type="text" id="lgUser" autocomplete="username" /></div>
+      <div class="field"><label>密码</label><input type="password" id="lgPass" autocomplete="current-password" /></div>
+      <button class="btn primary" id="lgBtn">登录</button>
+      <p class="err" id="lgErr"></p>
+    </div>
+  </div>
+</div>
+
+<!-- 主界面 -->
+<div class="wrap" id="mainView" style="display:none">
+  <div class="agent-top">
+    <div>
+      <div class="who" id="agName">-</div>
+      <div class="meta" id="agMeta">-</div>
+    </div>
+    <div class="spacer" style="flex:1"></div>
+    <span class="badge-left" id="agLeft">剩余配额 -</span>
+    <button class="btn ghost sm" id="btnOut">退出</button>
+  </div>
+
+  <!-- 制卡 -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-head">
+      <h2>制卡</h2>
+      <span class="desc">可选规格与数量由上游分配，用完为止</span>
+    </div>
+    <div class="card-body">
+      <div class="grid g3" style="margin-bottom:13px">
+        <div class="field"><label>卡密规格</label><select id="quotaSel"></select></div>
+        <div class="field"><label>生成数量</label><input type="number" id="genCount" value="1" min="1" /></div>
+        <div class="field"><label>卡密前缀</label><input type="text" id="genPrefix" placeholder="选填，如 VIP" maxlength="8" /></div>
+      </div>
+      <div class="field" style="margin-bottom:13px"><label>批次备注</label>
+        <input type="text" id="genNote" placeholder="选填，方便自己记账" />
+      </div>
+      <p class="quota-hint" id="quotaHint">选择规格后显示剩余数量</p>
+      <div class="btn-group" style="margin-top:13px">
+        <button class="btn primary" id="btnGen">生成卡密</button>
+      </div>
+      <div class="gen-out" id="genOut">
+        <div class="divider"></div>
+        <div class="card-head" style="padding:0 0 8px"><h2 style="font-size:13px">本次结果</h2>
+          <div class="actions"><button class="btn ghost sm" id="btnCopy">复制全部</button>
+          <button class="btn ghost sm" id="btnDl">下载 TXT</button></div>
+        </div>
+        <pre id="genPre"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- 我的卡密 -->
+  <div class="card">
+    <div class="card-head">
+      <h2>我的卡密</h2>
+      <span class="desc">只能看到并操作自己制的卡</span>
+      <div class="actions">
+        <select id="fStatus" style="width:126px">
+          <option value="">全部状态</option>
+          <option value="unused">未使用</option>
+          <option value="active">使用中</option>
+          <option value="expired">已过期</option>
+          <option value="banned">已封禁</option>
+        </select>
+        <input type="text" id="fQ" placeholder="搜卡密 / 备注 / 批次" style="width:190px" />
+        <button class="btn sm" id="btnQ">查询</button>
+      </div>
+    </div>
+    <div class="tw tall"><table>
+      <thead><tr>
+        <th style="width:34px"><input type="checkbox" id="ckAll" /></th>
+        <th>卡密</th><th>应用</th><th>类型</th><th>状态</th>
+        <th>到期 / 额度</th><th>设备</th><th>换绑</th><th>备注</th><th>批次</th>
+      </tr></thead>
+      <tbody id="cardBody"></tbody>
+    </table></div>
+    <div class="pager">
+      <span id="pageInfo" class="num"></span>
+      <div class="spacer"></div>
+      <span class="no-del">代理商无删除权限</span>
+      <button class="btn sm" id="btnPrev">上一页</button>
+      <button class="btn sm" id="btnNext">下一页</button>
+    </div>
+    <div class="card-body tight" id="bulkBar" style="display:none;border-top:1px solid var(--border)">
+      <div class="actions">
+        <span class="num" id="bulkCount">已选 0 张</span>
+        <button class="btn sm" data-act="ban">封禁</button>
+        <button class="btn sm" data-act="unban">解封</button>
+        <button class="btn sm" data-act="unbind">解绑设备</button>
+        <button class="btn sm" data-act="unbind_reset">重置换绑次数</button>
+        <button class="btn sm" data-act="reset">重置为未使用</button>
+        <button class="btn ghost sm" id="bulkClear">取消选择</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toastRoot"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var BASE = '';
+  var TOKEN = localStorage.getItem('ka_agent_token') || '';
+  var ME = null;
+  var QUOTAS = [];
+  var PAGE = 1, SIZE = 50, TOTAL = 0, SEL = {};
+  var LAST_CODES = [];
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function toast(msg, type) {
+    var d = document.createElement('div');
+    d.textContent = msg;
+    d.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:999;padding:10px 14px;' +
+      'border-radius:8px;font-size:13px;color:#fff;background:' +
+      (type === 'error' ? '#DC2626' : (type === 'warn' ? '#B45309' : '#16A34A'));
+    document.body.appendChild(d);
+    setTimeout(function () { d.remove(); }, 2600);
+  }
+
+  // ---------------------------------------------------------------- 请求
+  function api(path, opt) {
+    opt = opt || {};
+    var h = { 'Content-Type': 'application/json' };
+    if (TOKEN) { h['X-Agent-Token'] = TOKEN; }
+    return fetch(BASE + path, {
+      method: opt.method || 'GET', headers: h, body: opt.body
+    }).then(function (r) {
+      if (r.status === 401) { logoutLocal(); throw new Error('NO_AUTH'); }
+      return r.json();
+    });
+  }
+  function post(path, body) {
+    return api(path, { method: 'POST', body: JSON.stringify(body || {}) });
+  }
+
+  // ---------------------------------------------------------------- 登录
+  function login() {
+    var u = $('lgUser').value.trim(), p = $('lgPass').value;
+    if (!u || !p) { $('lgErr').textContent = '账号和密码都要填'; return; }
+    $('lgErr').textContent = '';
+    post('/api/agent/login', { username: u, password: p }).then(function (d) {
+      if (!d.ok) { $('lgErr').textContent = d.msg || '登录失败'; return; }
+      TOKEN = d.token;
+      localStorage.setItem('ka_agent_token', TOKEN);
+      boot();
+    }).catch(function () { $('lgErr').textContent = '网络错误'; });
+  }
+
+  function logoutLocal() {
+    TOKEN = '';
+    localStorage.removeItem('ka_agent_token');
+    $('mainView').style.display = 'none';
+    $('loginView').style.display = '';
+  }
+
+  function logout() {
+    post('/api/agent/logout', {}).catch(function () {}).then(logoutLocal);
+  }
+
+  // ---------------------------------------------------------------- 初始化
+  function boot() {
+    api('/api/agent/me').then(function (d) {
+      if (!d.ok) { logoutLocal(); return; }
+      ME = d.agent;
+      QUOTAS = d.quotas || [];
+      $('loginView').style.display = 'none';
+      $('mainView').style.display = '';
+      $('agName').textContent = ME.name || ME.username;
+      $('agMeta').textContent = '账号 ' + ME.username + ' · 上次登录 ' + ME.last_login_text;
+      $('agLeft').textContent = '剩余配额 ' + d.quota_left + ' 张 · 已制 ' + d.cards_made;
+      renderQuotas();
+      loadCards(1);
+    }).catch(function () { logoutLocal(); });
+  }
+
+  function renderQuotas() {
+    var sel = $('quotaSel');
+    if (!QUOTAS.length) {
+      sel.innerHTML = '<option value="">（管理员还没给你分配配额）</option>';
+      $('quotaHint').textContent = '暂无可用的制卡配额，请联系上游管理员分配。';
+      $('btnGen').disabled = true;
+      return;
+    }
+    $('btnGen').disabled = false;
+    sel.innerHTML = QUOTAS.map(function (q) {
+      var unit = q.duration_days > 0
+        ? (q.card_type === 'hour' ? q.duration_days + ' 小时' : q.duration_days + ' 天')
+        : '永久';
+      var label = q.app_name + ' · ' + (q.card_type === 'hour' ? '小时卡' : '天数卡') +
+        ' ' + unit + ' · ' + q.max_devices + ' 设备 · 剩 ' + q.quota_left + ' 张';
+      return '<option value="' + q.id + '">' + esc(label) + '</option>';
+    }).join('');
+    onQuotaChange();
+  }
+
+  function onQuotaChange() {
+    var q = QUOTAS.filter(function (x) { return String(x.id) === $('quotaSel').value; })[0];
+    if (!q) { return; }
+    $('genCount').max = String(q.quota_left);
+    if (parseInt($('genCount').value, 10) > q.quota_left) {
+      $('genCount').value = String(Math.max(1, q.quota_left));
+    }
+    $('quotaHint').textContent =
+      '这条配额：共 ' + q.quota_total + ' 张，已用 ' + q.quota_used + ' 张，剩余 ' + q.quota_left +
+      ' 张。换绑 ' + q.unbind_limit + ' 次/张。';
+  }
+
+  // ---------------------------------------------------------------- 制卡
+  function doGen() {
+    var qid = $('quotaSel').value;
+    if (!qid) { toast('先选规格', 'warn'); return; }
+    var n = parseInt($('genCount').value, 10);
+    if (isNaN(n) || n < 1) { toast('数量至少 1', 'error'); return; }
+    $('btnGen').disabled = true;
+    post('/api/agent/cards', {
+      quota_id: qid, count: n,
+      prefix: $('genPrefix').value.trim(),
+      note: $('genNote').value.trim()
+    }).then(function (d) {
+      $('btnGen').disabled = false;
+      if (!d.ok) { toast(d.msg || '生成失败', 'error'); return; }
+      LAST_CODES = d.codes || [];
+      $('genOut').classList.add('on');
+      $('genPre').textContent = LAST_CODES.join('\n');
+      toast('已生成 ' + d.count + ' 张，剩余配额 ' + d.quota_left);
+      boot();
+    }).catch(function () { $('btnGen').disabled = false; toast('网络错误', 'error'); });
+  }
+
+  // ---------------------------------------------------------------- 卡密列表
+  function loadCards(p) {
+    PAGE = Math.max(1, p || 1);
+    SEL = {};
+    $('ckAll').checked = false;
+    renderBulk();
+    var qs = '?page=' + PAGE + '&size=' + SIZE +
+      '&q=' + encodeURIComponent($('fQ').value.trim()) +
+      '&status=' + encodeURIComponent($('fStatus').value);
+    api('/api/agent/cards' + qs).then(function (d) {
+      if (!d.ok) { return; }
+      TOTAL = d.total;
+      $('cardBody').innerHTML = d.items.length ? d.items.map(row).join('')
+        : '<tr><td colspan="10"><div class="empty"><p>还没有制过卡</p>' +
+          '<div class="sm">选一种规格，在上面点「生成卡密」</div></div></td></tr>';
+      var pages = Math.max(1, Math.ceil(TOTAL / SIZE));
+      $('pageInfo').textContent = '共 ' + TOTAL + ' 条 · 第 ' + PAGE + ' / ' + pages + ' 页';
+      $('btnPrev').disabled = PAGE <= 1;
+      $('btnNext').disabled = PAGE >= pages;
+    }).catch(function () {});
+  }
+
+  function badge(it) {
+    if (it.status === 'banned') { return '<span class="badge b-danger">已封禁</span>'; }
+    if (it.status === 'unused') { return '<span class="badge b-info">未使用</span>'; }
+    if (it.expired) { return '<span class="badge b-warn">已过期</span>'; }
+    return '<span class="badge b-success">使用中</span>';
+  }
+
+  function row(it) {
+    return '<tr>' +
+      '<td><input type="checkbox" class="rowck" value="' + esc(it.code) + '" /></td>' +
+      '<td class="code">' + esc(it.code) + '</td>' +
+      '<td>' + esc(it.app_name) + '</td>' +
+      '<td><span class="badge b-gray plain">' + esc(it.card_type_text) + '</span></td>' +
+      '<td>' + badge(it) + '</td>' +
+      '<td class="dim num">' + esc(it.expires_text) + '</td>' +
+      '<td class="num">' + it.devices + ' / ' + it.max_devices + '</td>' +
+      '<td class="num">' + it.unbind_left + '</td>' +
+      '<td>' + (it.note ? esc(it.note) : '<span class="dim">-</span>') + '</td>' +
+      '<td class="dim">' + esc(it.batch) + '</td></tr>';
+  }
+
+  function renderBulk() {
+    var n = Object.keys(SEL).length;
+    $('bulkBar').style.display = n ? '' : 'none';
+    $('bulkCount').textContent = '已选 ' + n + ' 张';
+  }
+
+  function doAction(act) {
+    var codes = Object.keys(SEL);
+    if (!codes.length) { toast('先勾选卡密', 'warn'); return; }
+    post('/api/agent/cards/action', { codes: codes, action: act }).then(function (d) {
+      if (!d.ok) { toast(d.msg || '操作失败', 'error'); return; }
+      toast('已处理 ' + d.affected + ' 张' + (d.skipped ? '，跳过 ' + d.skipped + ' 张' : ''));
+      loadCards(PAGE);
+    }).catch(function () {});
+  }
+
+  // ---------------------------------------------------------------- 绑定
+  function bind() {
+    $('lgBtn').onclick = login;
+    $('lgPass').onkeydown = function (e) { if (e.key === 'Enter') { login(); } };
+    $('btnOut').onclick = logout;
+    $('quotaSel').onchange = onQuotaChange;
+    $('btnGen').onclick = doGen;
+    $('btnCopy').onclick = function () {
+      if (!LAST_CODES.length) { return; }
+      var t = LAST_CODES.join('\n');
+      if (navigator.clipboard) { navigator.clipboard.writeText(t); }
+      toast('已复制 ' + LAST_CODES.length + ' 张');
+    };
+    $('btnDl').onclick = function () {
+      if (!LAST_CODES.length) { return; }
+      var blob = new Blob([LAST_CODES.join('\n')], { type: 'text/plain;charset=utf-8' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'cards-' + Date.now() + '.txt';
+      a.click();
+    };
+    $('btnQ').onclick = function () { loadCards(1); };
+    $('fStatus').onchange = function () { loadCards(1); };
+    $('fQ').onkeydown = function (e) { if (e.key === 'Enter') { loadCards(1); } };
+    $('btnPrev').onclick = function () { loadCards(PAGE - 1); };
+    $('btnNext').onclick = function () { loadCards(PAGE + 1); };
+    $('ckAll').onchange = function () {
+      var on = this.checked;
+      document.querySelectorAll('.rowck').forEach(function (b) {
+        b.checked = on;
+        if (on) { SEL[b.value] = 1; } else { delete SEL[b.value]; }
+      });
+      renderBulk();
+    };
+    $('cardBody').onchange = function (e) {
+      var b = e.target;
+      if (!b.classList.contains('rowck')) { return; }
+      if (b.checked) { SEL[b.value] = 1; } else { delete SEL[b.value]; }
+      var all = document.querySelectorAll('.rowck');
+      $('ckAll').checked = all.length > 0 &&
+        document.querySelectorAll('.rowck:checked').length === all.length;
+      renderBulk();
+    };
+    document.querySelectorAll('#bulkBar [data-act]').forEach(function (b) {
+      b.onclick = function () { doAction(b.getAttribute('data-act')); };
+    });
+    $('bulkClear').onclick = function () {
+      SEL = {};
+      document.querySelectorAll('.rowck').forEach(function (b) { b.checked = false; });
+      $('ckAll').checked = false;
+      renderBulk();
+    };
+  }
+
+  bind();
+  if (TOKEN) { boot(); } else { $('loginView').style.display = ''; }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,147 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.8", "3.10", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: 语法检查
+        run: |
+          python -m py_compile server.py client_demo.py kauth/*.py tests/*.py
+          echo "py_compile OK"
+
+      - name: 依赖检查（项目必须零第三方依赖）
+        run: |
+          if [ -f requirements.txt ]; then
+            echo "::error::项目约定零依赖，不应存在 requirements.txt"
+            exit 1
+          fi
+          python - <<'PY'
+          import ast, pathlib, sys
+          stdlib = set(sys.stdlib_module_names) if hasattr(sys, "stdlib_module_names") else set()
+          third = set()
+          for p in pathlib.Path(".").rglob("*.py"):
+              if ".git" in p.parts:
+                  continue
+              tree = ast.parse(p.read_text(encoding="utf-8"))
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      mods = [a.name.split(".")[0] for a in node.names]
+                  elif isinstance(node, ast.ImportFrom):
+                      if node.level:        # 相对导入 (from . import x)，不算第三方
+                          continue
+                      mods = [(node.module or "").split(".")[0]]
+                  else:
+                      continue
+                  for m in mods:
+                      if not m or m in ("kauth", "client_demo", "tests"):
+                          continue
+                      if stdlib and m not in stdlib:
+                          third.add(m)
+          third -= {"kauth"}
+          if third:
+              print("检测到疑似第三方导入:", sorted(third))
+              sys.exit(1)
+          print("零第三方依赖检查通过")
+          PY
+
+      - name: 端到端自测（100 项）
+        env:
+          KEYAUTH_DATA: ${{ runner.temp }}/ka-ci
+          PYTHONIOENCODING: utf-8
+        run: python tests/selftest.py
+
+      - name: 冒烟：起服务 + 健康检查
+        env:
+          KEYAUTH_DATA: ${{ runner.temp }}/ka-smoke
+        run: |
+          python server.py --host 127.0.0.1 --port 8787 &
+          SRV=$!
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8787/api/health > /tmp/health.json 2>/dev/null; then
+              break
+            fi
+            sleep 0.5
+          done
+          cat /tmp/health.json
+          python - <<'PY'
+          import json
+          d = json.load(open("/tmp/health.json"))
+          assert d["ok"] is True, d
+          assert d["name"] == "keyauth", d
+          print("健康检查通过，version =", d.get("version"))
+          PY
+          kill $SRV
+
+  frontend:
+    name: 前端静态检查
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: app.js 语法
+        run: node --check static/app.js
+      - name: 文档死链检查
+        run: python tests/check_links.py
+
+      - name: 文档配图体积
+        run: |
+          python - <<'PY'
+          import pathlib, sys
+          big = []
+          for p in pathlib.Path("docs/images").glob("*"):
+              if p.is_file() and p.stat().st_size > 600 * 1024:
+                  big.append("%s %.1f MB" % (p.name, p.stat().st_size / 1048576))
+          if big:
+              print("::error::文档配图过大（>600KB），先压缩再提交：")
+              print("\n".join(big))
+              sys.exit(1)
+          print("文档配图体积检查通过")
+          PY
+
+      - name: 资源引用检查
+        run: |
+          python - <<'PY'
+          import re, pathlib
+          html = pathlib.Path("static/index.html").read_text(encoding="utf-8")
+          refs = re.findall(r'(?:href|src)="(/[^"]+)"', html)
+          print("引用的资源:", refs)
+          for r in refs:
+              r = r.split("?")[0].lstrip("/")
+              p = pathlib.Path("static") / r
+              if r and not p.exists():
+                  raise SystemExit("缺失静态资源: " + r)
+          # 内联 onclick 必须只调 window 上的函数
+          inline = re.findall(r'on(?:click|change|input)="([^"]+)"', html)
+          bad = [x for x in inline
+                 if re.match(r'^[a-zA-Z_$][\w$]*\(', x)
+                 and not x.startswith(("KA.", "window."))]
+          print("内联事件:", len(inline), "个")
+          if bad:
+              print("以下内联调用需确认已挂到 window:", bad)
+          print("静态检查通过")
+          PY

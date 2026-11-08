@@ -1,0 +1,7 @@
+# GitHub 会把这里的链接渲染成仓库右上角的 Sponsor 按钮。
+# 官方支持的平台（github / patreon / ko_fi / tidelift / community_bridge /
+# liberapay / issuehunt / lfx_crowdfunding / polar / buy_me_a_coffee / thanks_dev）
+# 国内都不好用，所以走 custom：指向仓库里的赞助页，页面里放收款码。
+#
+# custom 最多 4 个链接，必须是 http(s) 绝对地址。
+custom: ["https://github.com/Ytong825/keyauth/blob/main/docs/SPONSOR.md"]

@@ -1,0 +1,77 @@
+name: 报告 Bug
+description: 有东西不工作？按这个模板填，能省掉一轮来回追问
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提交前先确认：
+        - 已搜索过现有 issue
+        - 已看过 [docs/FAQ.md](https://github.com/Ytong825/keyauth/blob/main/docs/FAQ.md)
+        - **把卡密、AppSecret、管理令牌、真实 IP 全部打码**
+
+        安全问题不要走这里，见 [SECURITY.md](https://github.com/Ytong825/keyauth/blob/main/SECURITY.md)。
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 现象
+      description: 发生了什么，期望是什么
+      placeholder: |
+        点「卡密库」的下一页没反应，页码一直停在 1/4。
+        期望翻到第 2 页。
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开后台 → 卡密库
+        2. 确认列表有 4 页
+        3. 点「下一页」
+        4. 无反应，控制台报 xxx
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 版本 / commit
+      description: 后台首页底部、或 `git log --oneline -1`
+      placeholder: 1.1.0 / 0cf7c8f
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: 环境
+      description: 操作系统、Python 版本、浏览器
+      placeholder: Ubuntu 24.04 / Python 3.12.3 / Chrome 131
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志
+      description: |
+        `journalctl -u keyauth -n 50 --no-pager`
+        `tail -50 data/server.log`
+        浏览器控制台报错
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 确认
+      options:
+        - label: 我已删除所有卡密、密钥、令牌和真实 IP
+          required: true
+        - label: 这不是安全问题（安全问题走私密报告）
+          required: true

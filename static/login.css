@@ -1,0 +1,425 @@
+/* ==========================================================================
+   KeyAuth · 登录页 v9 —— 极简
+   --------------------------------------------------------------------------
+   这一版把背景装饰**全部删掉**。
+
+   之前几版一直在"换个图案铺满屏幕"（点阵 → 波纹 → 扭索纹），方向就是错的。
+   真正显高级的登录页 —— Linear / Vercel / Stripe / Dub.sh —— 共同点是：
+   **背景几乎什么都不放，功夫全在留白和控件的精度上。**
+   Dub 的登录页被总结成一句话：
+     "The absence of large illustrations or background images keeps the
+      environment distraction-free."
+
+   所以这一版只做减法，靠这五件事撑质感：
+
+     1. 背景 = 一个近乎无色的灰白，最多一层几乎看不见的柔光
+     2. 内容放进一张卡片：**1px 极淡描边 + 两层克制的阴影**
+        （不是大模糊光晕 —— 那是"发光"，被点名否过）
+     3. 控件：**白底 + 细描边**（不是灰填充），聚焦时描边加深 + 一圈极淡 ring
+     4. 圆角统一 16 / 10px；文字用深灰不用纯黑；标题字距收紧
+     5. 动效只剩一个淡入，**背景不做任何动画**
+
+   三套配色仍在（?lgskin=paper|ink|postal），默认这套是浅色极简。
+   ========================================================================== */
+
+.lg {
+  --l-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+            "Microsoft YaHei", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+  --l-mono: "Cascadia Mono", "JetBrains Mono", Consolas, "SF Mono", Menlo,
+            "DejaVu Sans Mono", monospace;
+
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  padding: 40px 24px;
+  overflow: hidden;
+  font-family: var(--l-sans);
+  color: var(--l-ink);
+  background: var(--l-bg);
+  --l-shadow:
+    0 1px 2px rgba(0, 0, 0, .04),
+    0 16px 40px -16px rgba(0, 0, 0, .13);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  animation: lgFadeIn .3s ease both;
+}
+@keyframes lgFadeIn { from { opacity: 0 } }
+
+.lg.out { animation: lgOut .36s cubic-bezier(.4, 0, .2, 1) forwards }
+@keyframes lgOut {
+  to { opacity: 0; transform: scale(1.008); visibility: hidden }
+}
+
+/* ============================ 三套配色 ============================ */
+/* 文字刻意不用纯黑：纯黑在浅底上偏硬，深灰更柔。 */
+.lg[data-skin="paper"] {
+  --l-bg: #EEF2FF;
+  --l-ink: #1E1B4B;  --l-ink2: #4C4A7A;  --l-ink3: #6B6899;
+  --l-card: rgba(255, 255, 255, .94);
+  --l-card-line: rgba(30, 27, 75, .10);
+  --l-pat: rgba(30, 27, 75, .13);
+  --l-field: #FFFFFF;
+  --l-line: rgba(0, 0, 0, .10);
+  --l-line-hover: rgba(0, 0, 0, .18);
+  --l-line-focus: rgba(0, 0, 0, .36);
+  --l-focus-ring: rgba(0, 0, 0, .05);
+  --l-btn: #1E1B4B;  --l-btn-fg: #FFFFFF;  --l-btn-hover: #322C73;
+  --l-glow: rgba(255, 255, 255, .90);
+  /* 背景柔光色：刻意压低饱和度，只给"氛围"，不成立图案 */
+  --l-m1: rgba(178, 204, 246, .54);   /* 淡蓝 */
+  --l-m2: rgba(212, 196, 244, .50);   /* 淡紫 */
+  --l-m3: rgba(248, 214, 194, .48);   /* 淡桃 */
+  --l-grid: rgba(0, 0, 0, .090);          /* 结构层的线（网格 / 同心弧） */
+  /* 底色调：一层覆盖全屏的对角渐变，保证整屏都有色、不留白心 */
+  --l-t1: rgba(199, 214, 243, .90);
+  --l-lift: rgba(255, 255, 255, .72);
+  --l-beam: rgba(255, 255, 255, .66);   /* 斜向光带（芯） */
+  --l-beam2: rgba(255, 255, 255, .38);  /* 光带边缘，比芯淡 */
+  --l-disc: rgba(255, 255, 255, .74);   /* 巨型圆的盘面 */
+  --l-shade: rgba(104, 112, 140, .16);
+  --l-t2: rgba(229, 220, 243, .58);
+  --l-t3: rgba(247, 227, 212, .86);
+  --l-m4: rgba(190, 214, 244, .46);        /* 附加柔光，给 mesh 方案用 */
+  --l-m5: rgba(240, 216, 234, .44);
+  --l-accent: #B42318;  --l-ok: #15803D;
+}
+.lg[data-skin="ink"] {
+  --l-bg: #0B0B0D;
+  --l-ink: #FAFAFA;  --l-ink2: #A1A1AA;  --l-ink3: #8A8A93;
+  --l-card: #141416;
+  --l-card-line: rgba(255, 255, 255, .08);
+  --l-field: #141416;
+  --l-line: rgba(255, 255, 255, .12);
+  --l-line-hover: rgba(255, 255, 255, .20);
+  --l-line-focus: rgba(255, 255, 255, .38);
+  --l-focus-ring: rgba(255, 255, 255, .06);
+  --l-btn: #FAFAFA;  --l-btn-fg: #0B0B0D;  --l-btn-hover: #FFFFFF;
+  --l-glow: rgba(255, 255, 255, .05);
+  --l-m1: rgba(46, 78, 150, .40);
+  --l-m2: rgba(88, 54, 136, .36);
+  --l-m3: rgba(140, 70, 52, .32);
+  --l-grid: rgba(255, 255, 255, .080);
+  --l-t1: rgba(24, 44, 90, .82);
+  --l-lift: rgba(255, 255, 255, .10);
+  --l-beam: rgba(255, 255, 255, .085);
+  --l-beam2: rgba(255, 255, 255, .045);
+  --l-disc: rgba(255, 255, 255, .055);
+  --l-shade: rgba(0, 0, 0, .42);
+  --l-t2: rgba(42, 30, 72, .62);
+  --l-t3: rgba(72, 38, 36, .72);
+  --l-m4: rgba(42, 70, 132, .34);
+  --l-m5: rgba(78, 50, 116, .32);
+  --l-accent: #F87171;  --l-ok: #4ADE80;
+}
+.lg[data-skin="postal"] {
+  --l-bg: #F4F6F3;
+  --l-ink: #14181A;  --l-ink2: #4B5563;  --l-ink3: #6B7280;
+  --l-card: #FFFFFF;
+  --l-card-line: rgba(16, 23, 16, .08);
+  --l-field: #FFFFFF;
+  --l-line: rgba(16, 23, 16, .11);
+  --l-line-hover: rgba(16, 23, 16, .19);
+  --l-line-focus: rgba(16, 23, 16, .36);
+  --l-focus-ring: rgba(16, 23, 16, .05);
+  --l-btn: #14181A;  --l-btn-fg: #FFFFFF;  --l-btn-hover: #2A3033;
+  --l-glow: rgba(255, 255, 255, .88);
+  --l-m1: rgba(178, 212, 194, .52);
+  --l-m2: rgba(202, 222, 202, .48);
+  --l-m3: rgba(244, 226, 192, .46);
+  --l-grid: rgba(16, 23, 16, .088);
+  --l-t1: rgba(196, 220, 205, .90);
+  --l-lift: rgba(255, 255, 255, .70);
+  --l-beam: rgba(255, 255, 255, .64);
+  --l-beam2: rgba(255, 255, 255, .36);
+  --l-disc: rgba(255, 255, 255, .72);
+  --l-shade: rgba(96, 108, 98, .15);
+  --l-t2: rgba(224, 229, 211, .58);
+  --l-t3: rgba(244, 227, 198, .86);
+  --l-m4: rgba(184, 214, 196, .44);
+  --l-m5: rgba(236, 220, 194, .42);
+  --l-accent: #B42318;  --l-ok: #15803D;
+}
+
+/* ============================ 背景 ============================ */
+/* 大尺度、低饱和的柔光色场 —— 参考 Linear / Stripe / Dub 那类做法：
+   不是"画图案"，而是**让底色本身有色彩和明暗的呼吸**。
+   色斑直径都在 40vw 以上、边缘羽化到 70%，所以看不出"这是一团东西"，
+   只会觉得底色是活的。这也是它和"满屏纹理"的根本差别。
+   层比容器大 24%，漂移时才不会露边。 */
+.lg-bg {
+  position: absolute; inset: -26%;
+  pointer-events: none;
+  /* 默认风格 = 流体网格渐变（Mesh Gradient）
+     当下最主流的一招：几个高饱和的大色团互相交叠、缓慢游走。
+     关键：色团要**够大、够饱和、够明确**。
+     前几版我一直在把它们往"看不见"里压，结果就是反复被说的"白板"。 */
+  /* 珠光白：近白底 + 极淡冷暖柔光（左上微冷 / 右下微暖），
+     对角渐变兜底 —— 白，但不是白板。 */
+  background-image:
+    radial-gradient(circle 56vw at 10% 6%,
+      rgba(203, 213, 246, .55) 0%, transparent 62%),
+    radial-gradient(circle 50vw at 92% 96%,
+      rgba(253, 230, 214, .50) 0%, transparent 64%),
+    linear-gradient(160deg, #FCFCFE 0%, #F6F7FB 46%, #FBF7F3 100%);
+  animation: lgPearl 26s ease-in-out infinite;
+}
+@keyframes lgPearl {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1) }
+  50%      { transform: translate3d(-2.5%, 1.8%, 0) scale(1.07) }
+}
+
+@keyframes lgBgDrift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1) }
+  50%      { transform: translate3d(-2.6%, 2%, 0) scale(1.07) }
+}
+
+/* 登录成功：一圈 1px 描边圆从中心荡开（描边，不是发光） */
+.lg-ring {
+  position: absolute; left: 50%; top: 50%;
+  width: 420px; height: 420px; margin: -210px 0 0 -210px;
+  border-radius: 50%;
+  border: 1px solid var(--l-ok);
+  opacity: 0; pointer-events: none; z-index: 2;
+}
+.lg-ring.go { animation: lgRing .95s cubic-bezier(.16, .8, .3, 1) forwards }
+@keyframes lgRing {
+  0%   { opacity: .45; transform: scale(.34) }
+  65%  { opacity: .12 }
+  100% { opacity: 0; transform: scale(2.1) }
+}
+
+/* ============================ 卡片 ============================ */
+/* 阴影分两层：1px 的近影负责"贴着纸"，大偏移的远影负责"浮起来"。
+   只用一个 0 0 40px 的大模糊 = 发光，会显廉价。 */
+.lg-panel {
+  position: relative; z-index: 3;
+  width: 100%; max-width: 372px;
+  padding: 40px 38px 34px;
+  background: var(--l-card);
+  border: var(--l-card-w, 1px) solid var(--l-card-line);
+  border-radius: var(--l-card-r, 16px);
+  box-shadow: var(--l-shadow);
+  text-align: center;
+  /* 跟随鼠标做极轻的 3D 倾斜（约 ±3.5°）—— 幅度刻意压得很小，
+     大了会晕，也显得廉价。transform 由 JS 写在 inline style 上。 */
+  transform-style: preserve-3d;
+  transition: transform .38s cubic-bezier(.2, .8, .3, 1),
+              box-shadow .38s cubic-bezier(.2, .8, .3, 1);
+  will-change: transform;
+  /* 入场只动 opacity：transform 留给鼠标视差（两个一起抢会互相顶掉） */
+  animation: lgFadeIn .42s .04s ease both;
+}
+.lg-panel.shake { animation: lgShake .42s cubic-bezier(.36, .07, .19, .97) }
+@keyframes lgShake {
+  10%, 90%      { transform: translateX(-2px) }
+  20%, 80%      { transform: translateX(4px) }
+  30%, 50%, 70% { transform: translateX(-6px) }
+  40%, 60%      { transform: translateX(6px) }
+}
+
+.lg-mark {
+  display: block; width: 34px; height: 34px;
+  margin: 0 auto 20px; color: var(--l-ink);
+}
+.lg-mark svg { width: 100%; height: 100%; display: block }
+
+.lg-h {
+  margin: 0 0 8px;
+  font-size: 22px; font-weight: 600;
+  letter-spacing: -.021em; line-height: 1.3;
+  color: var(--l-ink);
+}
+.lg-sub {
+  margin: 0 0 26px;
+  font-size: 13.5px; line-height: 1.55;
+  color: var(--l-ink3);
+}
+
+/* ============================ 控件 ============================ */
+.lg-field { margin-bottom: 12px; text-align: left }
+
+/* 白底 + 细描边（不是灰填充）。静置就给足定义，聚焦只做加强。 */
+.lg-input {
+  display: flex; align-items: center; gap: 8px;
+  height: 44px; padding: 0 7px 0 14px;
+  background: var(--l-field);
+  border: 1px solid var(--l-line);
+  border-radius: 10px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.lg-input:hover { border-color: var(--l-line-hover) }
+.lg-input:focus-within {
+  border-color: var(--l-line-focus);
+  box-shadow: 0 0 0 3px var(--l-focus-ring);
+}
+
+/* app.css 里有 input[type=…] 的通用样式，特异性和 ".lg-input input" 相同，
+   只靠加载顺序分胜负太脆。加一层 .lg 提到 (0,2,1) 永久压过它。 */
+.lg .lg-input input {
+  flex: 1; min-width: 0; height: 100%;
+  padding: 0; margin: 0;
+  border: 0; outline: 0;
+  background: transparent;
+  box-shadow: none;
+  font: 14px/1 var(--l-sans);
+  color: var(--l-ink);
+  caret-color: var(--l-ink);
+}
+.lg .lg-input input:focus { border: 0; box-shadow: none; outline: 0 }
+.lg .lg-input input::placeholder { color: var(--l-ink3) }
+
+/* 浏览器自动填充会用 -internal-autofill-selected 涂一层浅色，
+   普通 background 覆盖不掉，只能用超大内阴影盖住。 */
+.lg .lg-input input:-webkit-autofill,
+.lg .lg-input input:-webkit-autofill:hover,
+.lg .lg-input input:-webkit-autofill:focus,
+.lg .lg-input input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px var(--l-field) inset;
+  box-shadow: 0 0 0 1000px var(--l-field) inset;
+  -webkit-text-fill-color: var(--l-ink);
+  caret-color: var(--l-ink);
+  transition: background-color 9999s ease-out 0s;
+}
+/* 去掉浏览器自带的密码按钮（我们自己有一个，两个会打架） */
+.lg .lg-input input::-ms-reveal,
+.lg .lg-input input::-ms-clear { display: none }
+.lg .lg-input input::-webkit-credentials-auto-fill-button,
+.lg .lg-input input::-webkit-strong-password-auto-fill-button {
+  visibility: hidden; display: none; pointer-events: none;
+}
+
+.lg-eye {
+  flex: none; width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 8px; background: transparent;
+  color: var(--l-ink3); cursor: pointer;
+  transition: color .15s, background .15s;
+}
+.lg-eye svg { width: 16px; height: 16px }
+.lg-eye:hover { color: var(--l-ink); background: rgba(127, 127, 127, .12) }
+
+.lg-btn {
+  position: relative; width: 100%; height: 44px; margin-top: 4px;
+  border: 0; border-radius: 10px; cursor: pointer;
+  background: var(--l-btn); color: var(--l-btn-fg);
+  font: 500 14px/1 var(--l-sans); letter-spacing: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background .15s, opacity .15s, transform .12s;
+}
+.lg-btn:hover:not(:disabled) { background: var(--l-btn-hover) }
+.lg-btn:active:not(:disabled) { transform: translateY(1px) }
+.lg-btn:disabled { cursor: default; opacity: .7 }
+.lg-btn svg { width: 16px; height: 16px; margin-right: 7px; flex: none }
+.lg-spin {
+  display: inline-block; width: 14px; height: 14px; flex: none;
+  margin-right: 8px; border-radius: 50%;
+  border: 1.6px solid currentColor; border-top-color: transparent;
+  opacity: .75; animation: lgSpin .7s linear infinite;
+}
+@keyframes lgSpin { to { transform: rotate(360deg) } }
+
+.lg-msg {
+  display: flex; align-items: flex-start; justify-content: center; gap: 6px;
+  margin-top: 12px; min-height: 17px; text-align: center;
+  font-size: 12.5px; line-height: 1.5; color: var(--l-accent);
+}
+.lg-msg:empty { margin-top: 0 }
+.lg-msg svg { width: 13px; height: 13px; flex: none; margin-top: 2px }
+.lg-msg.ok { color: var(--l-ok) }
+
+/* 自绘焦点环：浏览器默认的又粗又黑，跟这套不搭 */
+.lg-btn:focus-visible,
+.lg-eye:focus-visible {
+  outline: 2px solid var(--l-ink);
+  outline-offset: 2px;
+}
+
+/* ---------- PEARL · 珠光白（用户要的"高级白色搭配"） ----------
+   白不等于纯白板：底色用近白（#FAFAFC）而不是 #FFF，再叠极淡的冷暖柔光
+   （左上微冷、右下微暖），让白色带上温度。卡片用纯白 + 极淡描边浮起来。 */
+.lg[data-bg="pearl"] {
+  --l-bg: #FAFAFC;
+  --l-ink: #18181B;  --l-ink2: #52525B;  --l-ink3: #71717A;
+  --l-card: #FFFFFF;
+  --l-card-line: rgba(0, 0, 0, .07);
+  --l-card-w: 1px;
+  --l-field: #FFFFFF;
+  --l-line: rgba(0, 0, 0, .10);
+  --l-line-hover: rgba(0, 0, 0, .18);
+  --l-line-focus: rgba(0, 0, 0, .34);
+  --l-focus-ring: rgba(0, 0, 0, .05);
+  --l-btn: #18181B;  --l-btn-fg: #FFFFFF;  --l-btn-hover: #2D2D33;
+  --l-accent: #B42318;  --l-ok: #15803D;
+  --l-shadow:
+    0 1px 2px rgba(0, 0, 0, .04),
+    0 20px 44px -18px rgba(0, 0, 0, .13);
+  /* 点阵在白底上：近景稍重、远景更淡，才有层次 */
+  --l-pat: rgba(30, 41, 59, .15);
+  --l-pat2: rgba(30, 41, 59, .10);
+}
+
+@keyframes lgPearl {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1) }
+  50%      { transform: translate3d(-2.5%, 1.8%, 0) scale(1.07) }
+}
+
+/* ======================================================================
+   图案层：点阵（双层视差上浮）
+   ----------------------------------------------------------------------
+   独立一层 .lg-fig，叠在渐变之上，只补一层"结构"，不抢戏。三条硬约束
+   （缺一就退回"满屏纹理"那个被否过的坑）：
+     1. 间距大（近景 46px / 远景 92px）
+     2. 对比极低（--l-pat 约 .1 量级，近景重远景轻）
+     3. 必须有 mask 让图案向边缘渐隐，不能满屏均匀铺
+   ====================================================================== */
+.lg-fig {
+  position: absolute; inset: 0; pointer-events: none;
+  display: block; z-index: 1; overflow: hidden;
+}
+.lg-fig::before,
+.lg-fig::after { content: ""; position: absolute; inset: 0; }
+
+/* 近景：点大、走得快 */
+.lg-fig::before {
+  background-image: radial-gradient(circle, var(--l-pat) 0 3px, transparent 3.1px);
+  background-size: 46px 46px;
+  animation: lgDotsNear 13s linear infinite;
+}
+/* 远景：点小、走得慢 —— 同 13s、位移 1:2，速度天然差一倍 */
+.lg-fig::after {
+  background-image: radial-gradient(circle, var(--l-pat2) 0 1.7px, transparent 1.8px);
+  background-size: 92px 92px;
+  animation: lgDotsFar 13s linear infinite;
+}
+/* 位移必须等于自己那层的 background-size 整数倍，否则循环会跳 */
+@keyframes lgDotsNear { to { background-position: 0 -46px } }
+@keyframes lgDotsFar  { to { background-position: 0 -92px } }
+/* 整层：极缓呼吸 + 向边缘渐隐。mask 会连伪元素一起裁，写在这一层就够 */
+.lg-fig {
+  animation: lgDotsBreath 9s ease-in-out infinite;
+  -webkit-mask-image: radial-gradient(ellipse 90% 84% at 50% 44%,
+      #000 0%, rgba(0, 0, 0, .70) 44%, rgba(0, 0, 0, .22) 76%, transparent 100%);
+          mask-image: radial-gradient(ellipse 90% 84% at 50% 44%,
+      #000 0%, rgba(0, 0, 0, .70) 44%, rgba(0, 0, 0, .22) 76%, transparent 100%);
+}
+@keyframes lgDotsBreath {
+  0%, 100% { opacity: .78 }
+  50%      { opacity: 1 }
+}
+
+/* ============================ 响应式 ============================ */
+@media (max-width: 560px) {
+  .lg { padding: 28px 20px }
+  .lg-panel { max-width: 100%; padding: 34px 26px 28px }
+  .lg-h { font-size: 20px }
+  .lg-mark { width: 30px; height: 30px; margin-bottom: 16px }
+  .lg-ring { width: 300px; height: 300px; margin: -150px 0 0 -150px }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lg, .lg * { animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important }
+}

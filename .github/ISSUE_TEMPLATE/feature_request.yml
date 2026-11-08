@@ -1,0 +1,61 @@
+name: 功能建议
+description: 想要一个新能力，或者觉得某处可以更好
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提之前先看一眼 [CHANGELOG 的「计划中」](https://github.com/Ytong825/keyauth/blob/main/CHANGELOG.md)，
+        可能已经在路线图上了。
+
+        另外记住项目的核心约束：**不引入第三方依赖**。能做到这一点的方案更容易被接受。
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你遇到的实际问题
+      description: 描述场景，不要直接跳到方案
+      placeholder: |
+        我一次要发 500 张卡给不同渠道，现在只能全生成到同一个批次，
+        事后分不清哪张是哪个渠道的。
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: 你希望怎么做
+      placeholder: |
+        制卡时允许填「每张卡的备注模板」，或者生成后按行号批量分配备注。
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 考虑过的替代方案
+      description: 现在你是怎么绕过这个问题的
+    validations:
+      required: false
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 影响范围
+      options:
+        - 后台界面
+        - 客户端接口
+        - 授权引擎 / 状态机
+        - 部署与运维
+        - 文档
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: willing
+    attributes:
+      label: 参与意愿
+      options:
+        - label: 我可以提交 PR 实现这个
+          required: false

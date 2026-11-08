@@ -1,0 +1,19 @@
+# Windows 上必须关掉换行符转换，否则传到 Linux 的 .sh 会因 CRLF 无法执行
+* -text
+
+# 但文本文件显式走 LF（Linux 端要的就是 LF）
+*.sh text eol=lf
+*.py text eol=lf
+*.js text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+*.md  text eol=lf
+*.yml text eol=lf
+*.conf text eol=lf
+*.svg text eol=lf
+.gitignore text eol=lf
+.dockerignore text eol=lf
+
+# 图片按二进制处理，别做换行转换或 diff
+*.png binary

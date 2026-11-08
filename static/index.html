@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>KeyAuth · 卡密授权系统</title>
+<!-- 用绝对路径：后台既可能从 /admin 打开，也可能从 /admin/ 打开。
+     相对路径在 /admin/ 下会被解析成 /admin/app.js，直接 404，整页脚本不执行。 -->
+<link rel="stylesheet" href="/app.css?v=20261108i" />
+<link rel="stylesheet" href="/login.css" />
+<link rel="icon" href="/favicon.svg" />
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.1" stroke-linecap="round" stroke-linejoin="round"><path d="M11.9 12.1A4.55 4.55 0 1 0 6.1 6.3a4.55 4.55 0 0 0 5.8 5.8Z"/><path d="M11.9 12.1 19.4 19.6"/><path d="M16.6 16.8 18.9 14.5"/><path d="M19.4 19.6 21.7 17.3"/></svg>
+      </div>
+      <div class="brand-txt">
+        <b id="brandName">KeyAuth</b>
+        <span id="brandDesc">卡密授权验证系统</span>
+      </div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <div class="conn"><span class="dot" id="connDot"></span><span id="connTxt">未连接</span></div>
+      <button class="btn ghost sm" id="themeBtn" style="justify-content:flex-start"></button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn ghost icon hamburger" onclick="toggleSidebar()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <div>
+        <h1 id="pgTitle">概览</h1>
+        <div class="sub" id="pgSub">系统运行状况</div>
+      </div>
+      <div class="spacer"></div>
+      <!-- 右上角只放身份和退出。刷新交给各页自己的按钮，顶栏不再占一个坑 -->
+      <div class="who">
+        <span class="uname" id="topUser">-</span>
+        <span class="urole" id="topRole"></span>
+      </div>
+      <button class="btn ghost sm" onclick="KA.logout()" title="退出登录，换个账号进来">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+        退出
+      </button>
+    </header>
+
+    <div class="content">
+
+      <!-- ==================== 概览 ==================== -->
+      <section class="page active" id="page-overview">
+        <div class="banner" id="tokenWarn" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+          <div>
+            <b>管理令牌偏弱</b>
+            <span id="tokenWarnTxt">建议在「系统设置」里重置成随机长令牌</span>
+          </div>
+          <div class="spacer"></div>
+          <button class="btn sm" onclick="go('settings')">去重置</button>
+          <button class="btn ghost sm" onclick="dismissTokenWarn()">知道了</button>
+        </div>
+        <div class="stats" id="statGrid"></div>
+        <div class="split">
+          <div class="card">
+            <div class="card-head"><h2>近 7 日校验次数</h2><span class="desc">含验证 / 心跳 / 查询 / 解绑</span></div>
+            <div class="card-body"><div class="bar-chart" id="trendChart"></div></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h2>结果码分布</h2></div>
+            <div class="card-body" id="resultDist"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h2>最近校验记录</h2>
+            <div class="actions"><button class="btn ghost sm" onclick="go('logs')">查看全部</button></div>
+          </div>
+          <div class="tw"><table>
+            <thead><tr><th>时间</th><th>动作</th><th>结果</th><th>卡密</th><th>机器码</th><th>IP</th></tr></thead>
+            <tbody id="recentBody"></tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <!-- ==================== 制卡 ==================== -->
+      <section class="page" id="page-gen">
+        <div class="split">
+          <div class="card">
+            <div class="card-head"><h2>批量制卡</h2><span class="desc">卡密归属所选应用</span></div>
+            <div class="card-body">
+              <div class="grid g2" style="margin-bottom:13px">
+                <div class="field"><label>所属应用</label><select id="genApp"></select></div>
+                <div class="field"><label>套餐</label><select id="genPlan" onchange="onPlanChange()"></select></div>
+              </div>
+              <div class="grid g3" style="margin-bottom:13px">
+                <div class="field"><label>卡密类型</label>
+                  <select id="genType" onchange="onTypeChange()">
+                    <option value="time">天数卡</option>
+                    <option value="hour">小时卡</option>
+                  </select>
+                </div>
+                <div class="field"><label id="genDaysLabel">有效天数（0=永久）</label><input type="number" id="genDays" value="30" min="0" /></div>
+                <div class="field" id="genValueField" style="display:none"><label id="genValLabel">初始额度</label><input type="number" id="genValue" value="0" min="0" /></div>
+                <div class="field"><label>可绑定设备</label><input type="number" id="genDev" value="1" min="1" /></div>
+              </div>
+              <div class="grid g4" style="margin-bottom:15px">
+                <div class="field"><label>换绑次数</label><input type="number" id="genUnbind" value="1" min="0" /></div>
+                <div class="field"><label>生成数量</label><input type="number" id="genCount" value="10" min="1" max="10000" /></div>
+                <div class="field"><label>卡密前缀</label><input type="text" id="genPrefix" placeholder="如 VIP" maxlength="8" /></div>
+                <div class="field"><label>批次备注</label><input type="text" id="genNote" placeholder="选填" /></div>
+              </div>
+              <div class="btn-group">
+                <button class="btn primary" onclick="doGen()">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                  生成卡密
+                </button>
+                <button class="btn" onclick="copyGen()">复制本批</button>
+                <button class="btn" onclick="downloadGen()">下载 TXT</button>
+              </div>
+              <p class="field" style="margin:14px 0 0"><span class="hint">卡密首次被客户端校验时自动激活；天数卡按天、小时卡按小时从激活时刻开始计时，填 0 为永久。</span></p>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h2>生成结果</h2><span class="desc" id="genMeta"></span></div>
+            <div class="card-body">
+              <pre id="genOut" class="hidden"></pre>
+              <div class="empty empty-tight" id="genEmpty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                <p>还没有生成卡密</p>
+                <div class="sm">填好左侧参数后点「生成卡密」</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== 卡密库 ==================== -->
+      <section class="page" id="page-cards">
+        <div class="card">
+          <div class="card-body tight">
+            <div class="toolbar">
+              <div class="field grow"><label>搜索</label>
+                <div class="search">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+                  <input type="text" id="cardQ" placeholder="卡密 / 备注 / 批次" oninput="debounced(loadCards,1)" />
+                </div>
+              </div>
+              <div class="field"><label>状态</label>
+                <select id="cardStatus" onchange="loadCards(1)" style="width:128px">
+                  <option value="">全部状态</option>
+                  <option value="unused">未使用</option>
+                  <option value="active">使用中</option>
+                  <option value="expired">已过期</option>
+                  <option value="used_up">额度用尽</option>
+                  <option value="banned">已封禁</option>
+                </select>
+              </div>
+              <div class="field"><label>应用</label><select id="cardApp" onchange="loadCards(1)" style="width:146px"></select></div>
+              <div class="field"><label>类型</label>
+                <select id="cardType" onchange="loadCards(1)" style="width:112px">
+                  <option value="">全部类型</option>
+                  <option value="time">天数卡</option>
+                  <option value="hour">小时卡</option>
+                </select>
+              </div>
+              <button class="btn" onclick="loadCards(1)">查询</button>
+            </div>
+          </div>
+          <div class="tw tall"><table>
+            <thead><tr>
+              <th style="width:34px"><input type="checkbox" id="checkAll" onchange="toggleAll(this)" /></th>
+              <th>卡密</th><th>应用</th><th>套餐</th><th>类型</th><th>状态</th>
+              <th>到期 / 额度</th><th>设备</th><th>换绑</th><th>备注</th><th style="width:52px"></th>
+            </tr></thead>
+            <tbody id="cardBody"></tbody>
+          </table></div>
+          <div class="pager">
+            <span id="pageInfo" class="num"></span>
+            <div class="spacer"></div>
+            <button class="btn sm" onclick="exportCards()">导出 CSV</button>
+            <select id="cardSize" onchange="changeCardSize()" style="width:104px">
+              <option value="20">20 条/页</option>
+              <option value="50">50 条/页</option>
+              <option value="100">100 条/页</option>
+            </select>
+            <span class="num">跳到 <input type="number" id="cardJump" min="1" value="1" style="width:58px;padding:4px 7px" onkeydown="if(event.key==='Enter'){jumpCardPage();}" /> 页</span>
+            <button class="btn sm" id="prevBtn" onclick="prevCardPage()">上一页</button>
+            <button class="btn sm" id="nextBtn" onclick="nextCardPage()">下一页</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== 应用 ==================== -->
+      <section class="page" id="page-apps">
+        <div class="toolbar">
+          <p style="flex:1;margin:0;font-size:12.5px;color:var(--text-3)">
+            每个软件配一个应用，持有独立的 AppID 与密钥。某个软件密钥泄露时，重置它不影响其它软件。
+          </p>
+          <button class="btn primary" onclick="newApp()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            新建应用
+          </button>
+        </div>
+        <div class="app-grid" id="appGrid"></div>
+      </section>
+
+      <!-- ==================== 套餐 ==================== -->
+      <section class="page" id="page-plans">
+        <div class="toolbar">
+          <p style="flex:1;margin:0;font-size:12.5px;color:var(--text-3)">
+            套餐是制卡预设：一次定义好卡密类型、时长或额度、设备数、换绑次数，之后制卡直接选。
+          </p>
+          <button class="btn primary" onclick="editPlan(null)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            新建套餐
+          </button>
+        </div>
+        <div class="card"><div class="tw"><table>
+          <thead><tr><th>套餐名</th><th>归属应用</th><th>类型</th><th>时长 / 额度</th><th>设备数</th><th>换绑</th><th>价格</th><th>已发卡</th><th style="width:112px"></th></tr></thead>
+          <tbody id="planBody"></tbody>
+        </table></div></div>
+      </section>
+
+      <!-- ==================== 代理商 ==================== -->
+      <section class="page" id="page-agents">
+        <div class="toolbar">
+          <p style="flex:1;margin:0;font-size:12.5px;color:var(--text-3)">
+            给分销方开账号，按「应用 × 卡规格」发配额。代理商只能制卡和操作自己制的卡，
+            <b>没有删除权限</b>；所有动作会实时出现在「操作审计」里。
+          </p>
+          <button class="btn primary" onclick="newAgent()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            新建代理商
+          </button>
+        </div>
+        <div class="card">
+          <div class="tw"><table>
+            <thead><tr>
+              <th>账号</th><th>名称</th><th>状态</th><th>已制卡</th>
+              <th>配额（已用 / 总数）</th><th>可用应用</th><th>最近登录</th>
+              <th style="width:300px"></th>
+            </tr></thead>
+            <tbody id="agentBody"></tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <!-- ==================== 校验日志 ==================== -->
+      <section class="page" id="page-logs">
+        <div class="card">
+          <div class="card-body tight">
+            <div class="toolbar">
+              <div class="field grow"><label>搜索</label>
+                <div class="search">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+                  <input type="text" id="logQ" placeholder="卡密 / 机器码 / IP" oninput="debounced(loadLogs)" />
+                </div>
+              </div>
+              <div class="field"><label>结果</label><select id="logResult" onchange="loadLogs(1)" style="width:150px"></select></div>
+              <div class="field"><label>动作</label>
+                <select id="logAction" onchange="loadLogs(1)" style="width:120px">
+                  <option value="">全部动作</option>
+                  <option value="verify">验证</option><option value="heartbeat">心跳</option>
+                  <option value="query">查询</option><option value="unbind">解绑</option>
+                  <option value="ban">封禁</option>
+                </select>
+              </div>
+              <div class="field"><label>起始</label><input type="date" id="logFrom" onchange="loadLogs(1)" style="width:142px" /></div>
+              <div class="field"><label>结束</label><input type="date" id="logTo" onchange="loadLogs(1)" style="width:142px" /></div>
+              <button class="btn" onclick="loadLogs(1)">查询</button>
+            </div>
+          </div>
+          <div class="tw tall"><table>
+            <thead><tr><th>时间</th><th>动作</th><th>结果</th><th>卡密</th><th>机器码</th><th>IP</th><th>说明</th></tr></thead>
+            <tbody id="logBody"></tbody>
+          </table></div>
+          <div class="pager">
+            <span id="logInfo" class="num"></span>
+            <div class="spacer"></div>
+            <select id="logSize" onchange="loadLogs(1)" style="width:104px">
+              <option value="50">50 条/页</option>
+              <option value="100">100 条/页</option>
+              <option value="200">200 条/页</option>
+            </select>
+            <button class="btn sm" id="logPrev" onclick="logPrevPage()">上一页</button>
+            <button class="btn sm" id="logNext" onclick="logNextPage()">下一页</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== 操作审计 ==================== -->
+      <section class="page" id="page-audits">
+        <div class="card">
+          <div class="card-head">
+            <h2>后台操作审计</h2>
+            <span class="desc">记录每一次制卡、封禁、改配置等管理动作</span>
+            <div class="actions"><button class="btn ghost sm" onclick="loadAudits(1)">刷新</button></div>
+          </div>
+          <div class="card-body tight">
+            <div class="toolbar">
+              <div class="field grow"><label>搜索</label>
+                <div class="search">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+                  <input type="text" id="auditQ" placeholder="操作 / 对象 / 说明 / IP" oninput="debounced(loadAudits)" />
+                </div>
+              </div>
+              <div class="field"><label>操作</label>
+                <select id="auditAction" onchange="loadAudits(1)" style="width:170px">
+                  <option value="">全部操作</option>
+                  <option value="card.generate">制卡</option>
+                  <option value="card.delete">删除卡密</option>
+                  <option value="card.ban">封禁</option>
+                  <option value="card.unban">解封</option>
+                  <option value="card.unbind">解绑</option>
+                  <option value="card.renew">续期</option>
+                  <option value="app.create">新建应用</option>
+                  <option value="app.update">改应用</option>
+                  <option value="app.delete">删应用</option>
+                  <option value="settings.save">改设置</option>
+                  <option value="token.rotate">重置令牌</option>
+                </select>
+              </div>
+              <button class="btn" onclick="loadAudits(1)">查询</button>
+            </div>
+          </div>
+          <div class="tw tall"><table>
+            <thead><tr><th>时间</th><th>操作</th><th>对象</th><th>说明</th><th>来源 IP</th></tr></thead>
+            <tbody id="auditBody"></tbody>
+          </table></div>
+          <div class="pager">
+            <span id="auditInfo" class="num"></span>
+            <div class="spacer"></div>
+            <button class="btn sm" id="auditPrev" onclick="auditPrevPage()">上一页</button>
+            <button class="btn sm" id="auditNext" onclick="auditNextPage()">下一页</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== WebHook ==================== -->
+      <section class="page" id="page-webhooks">
+        <div class="card">
+          <div class="card-head">
+            <h2>WebHook 回调</h2>
+            <span class="desc">卡密激活、绑定设备、额度耗尽时推送到你的服务器</span>
+            <div class="actions">
+              <button class="btn sm primary" onclick="newWebhook()">新建回调</button>
+            </div>
+          </div>
+          <div class="tw"><table>
+            <thead><tr><th>归属</th><th>回调地址</th><th>事件</th><th>签名密钥</th><th>状态</th><th style="width:112px"></th></tr></thead>
+            <tbody id="hookBody"></tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <!-- ==================== 公告 ==================== -->
+      <section class="page" id="page-notices">
+        <div class="toolbar">
+          <p style="flex:1;margin:0;font-size:12.5px;color:var(--text-3)">
+            公告会在客户端校验成功时下发，可用来通知用户升级或维护安排。
+          </p>
+          <button class="btn primary" onclick="newNotice()">发布公告</button>
+        </div>
+        <div class="card"><div class="card-body" id="noticeBox"></div></div>
+      </section>
+
+      <!-- ==================== 系统设置 ==================== -->
+      <section class="page" id="page-settings">
+        <div class="split-even">
+          <div class="card">
+            <div class="card-head"><h2>站点信息</h2></div>
+            <div class="card-body">
+              <div class="grid g2" style="margin-bottom:13px">
+                <div class="field"><label>站点名称</label><input type="text" id="stName" /></div>
+                <div class="field"><label>站点描述</label><input type="text" id="stDesc" /></div>
+              </div>
+              <div class="field" style="margin-bottom:13px"><label>对外访问地址</label>
+                <input type="text" id="stBase" placeholder="留空则用当前浏览器地址，如 https://auth.example.com" />
+                <span class="hint">「接入文档」里展示给客户端的地址，反代或换端口后固定填这里</span>
+              </div>
+              <div class="field" style="margin-bottom:13px"><label>客户端公告</label>
+                <textarea id="stAnnounce" rows="3" placeholder="留空则不下发公告"></textarea>
+                <span class="hint">这段文字会随每次校验响应下发给客户端</span>
+              </div>
+              <div class="field"><label>最低客户端版本</label><input type="text" id="stMinVer" placeholder="留空不校验，如 1.2.0" /></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h2>安全策略</h2></div>
+            <div class="card-body">
+              <div class="grid g3" style="margin-bottom:14px">
+                <div class="field"><label>时间戳容差（秒）</label><input type="number" id="stSkew" min="30" max="3600" /></div>
+                <div class="field"><label>nonce 有效期（秒）</label><input type="number" id="stNonce" min="60" max="86400" /></div>
+                <div class="field"><label>单 IP 每分钟上限</label><input type="number" id="stRate" min="0" /></div>
+              </div>
+              <label class="switch" style="margin-bottom:11px">
+                <input type="checkbox" id="stSign" /><span class="track"></span>
+                <span>强制签名校验<em style="color:var(--text-3);font-style:normal">（关闭后允许无签名请求，仅建议调试用）</em></span>
+              </label>
+              <label class="switch">
+                <input type="checkbox" id="stMaint" /><span class="track"></span>
+                <span>维护模式<em style="color:var(--text-3);font-style:normal">（开启后拒绝所有 verify 请求）</em></span>
+              </label>
+              <div class="divider"></div>
+              <div class="btn-group">
+                <button class="btn primary" onclick="saveSettings()">保存设置</button>
+                <button class="btn danger" onclick="rotateToken()">重置管理令牌</button>
+              </div>
+              <p class="field" style="margin:12px 0 0"><span class="hint" id="tokStrength">当前令牌强度：检测中…</span></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="card-head">
+            <h2>数据维护</h2>
+            <span class="desc">日志回收与数据库备份</span>
+            <div class="actions"><button class="btn ghost sm" onclick="loadBackups()">刷新</button></div>
+          </div>
+          <div class="card-body">
+            <div class="grid g3" style="margin-bottom:14px">
+              <div class="field"><label>日志保留天数（0 = 永久）</label>
+                <input type="number" id="stLogDays" min="0" max="3650" />
+              </div>
+              <div class="field"><label>校验日志条数</label>
+                <input type="text" id="logStat" readonly />
+              </div>
+              <div class="field"><label>数据库文件</label>
+                <input type="text" id="dbStat" readonly />
+              </div>
+            </div>
+            <p class="field" style="margin:0 0 14px"><span class="hint">
+              心跳每 3 分钟一条，一台机器一天近 500 条。设成 0 会一直留着，几个月后查询会变慢。
+              改完记得点上面的「保存设置」。
+            </span></p>
+            <div class="btn-group" style="margin-bottom:14px">
+              <button class="btn" onclick="cleanupLogs()">立即清理过期日志</button>
+              <button class="btn" onclick="doBackup()">立即备份数据库</button>
+            </div>
+            <div class="tw"><table>
+              <thead><tr>
+                <th>备份文件</th><th style="width:110px">大小</th>
+                <th style="width:180px">时间</th><th style="width:90px"></th>
+              </tr></thead>
+              <tbody id="backupBody"></tbody>
+            </table></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px" id="adminsCard">
+          <div class="card-head">
+            <h2>管理员账号</h2>
+            <span class="desc">多人协作时各用各的账号，只有拥有者能在这里改动</span>
+            <div class="actions">
+              <button class="btn ghost sm" id="btnNewAdmin" onclick="newAdmin()">新建账号</button>
+              <button class="btn ghost sm" onclick="loadAdmins()">刷新</button>
+              <!-- 这个按钮任何角色都要能点到：非拥有者看不到下面的表格，
+                   但自己的两步验证得自己能管 -->
+              <button class="btn sm primary" onclick="myTotp()">我的两步验证</button>
+            </div>
+          </div>
+          <div id="adminTableWrap">
+          <div class="tw"><table>
+            <thead><tr>
+              <th>账号</th><th>名称</th><th style="width:110px">角色</th>
+              <th style="width:88px">状态</th><th style="width:96px">两步验证</th>
+              <th>最近登录</th>
+              <th style="width:392px"></th>
+            </tr></thead>
+            <tbody id="adminBody"></tbody>
+          </table></div>
+          <div class="card-body tight" style="border-top:1px solid var(--border)">
+            <p class="field" style="margin:0"><span class="hint">
+              当前登录：<b id="whoami">-</b>　·　
+              「只读」不能执行任何写操作；「管理员」不能管理账号；
+              「拥有者」拥有全部权限。配置文件里的超级令牌等同拥有者，脚本可继续用它。
+            </span></p>
+          </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== 接入文档 ==================== -->
+      <section class="page" id="page-docs">
+        <div class="card">
+          <div class="card-head"><h2>接入前准备</h2></div>
+          <div class="card-body">
+            <dl class="kv">
+              <dt>接口地址</dt><dd><code class="inline" id="docBase"></code></dd>
+              <dt>AppID</dt><dd><code class="inline" id="docAppId">先到「应用」页创建</code></dd>
+              <dt>AppSecret</dt><dd><code class="inline" id="docSecret">同上，用于签名</code></dd>
+              <dt>签名算法</dt><dd>
+                取<b>除 sign 外的全部参数</b>（空值也保留），按参数名 ASCII 升序拼成
+                <code class="inline">k1=v1&amp;k2=v2</code>，用 AppSecret 做 HMAC-SHA256，输出小写十六进制。
+              </dd>
+              <dt>机器码</dt><dd>CPU + 主板 + 硬盘序列号拼接后取 SHA256 前 32 位。不要用 MAC 地址。</dd>
+            </dl>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>接口一览</h2></div>
+          <div class="tw"><table>
+            <thead><tr><th>接口</th><th>方法</th><th>用途</th><th>调用时机</th></tr></thead>
+            <tbody>
+              <tr><td class="code">/api/v1/verify</td><td><span class="badge b-primary plain">POST</span></td><td>校验卡密并绑定机器码，首次调用即激活</td><td>软件启动 / 用户输入卡密</td></tr>
+              <tr><td class="code">/api/v1/heartbeat</td><td><span class="badge b-primary plain">POST</span></td><td>上报在线、检测是否被封禁或过期</td><td>运行中每 3~5 分钟</td></tr>
+              <tr><td class="code">/api/v1/query</td><td><span class="badge b-primary plain">POST</span></td><td>只查询状态，不绑定、不扣额度</td><td>展示剩余时长 / 次数</td></tr>
+              <tr><td class="code">/api/v1/unbind</td><td><span class="badge b-primary plain">POST</span></td><td>用户自助换绑设备（受次数限制）</td><td>用户点「更换设备」</td></tr>
+              <tr><td class="code">/api/v1/notices</td><td><span class="badge b-primary plain">POST</span></td><td>拉取公告列表</td><td>软件内公告栏</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>客户端接入示例</h2><span class="desc">机器码换成你软件里采集的硬件指纹</span></div>
+          <div class="tabs" id="docTabs">
+            <div class="tab active" data-tab="py">Python</div>
+            <div class="tab" data-tab="cs">C#</div>
+            <div class="tab" data-tab="js">JavaScript</div>
+            <div class="tab" data-tab="resp">返回码</div>
+          </div>
+          <div class="card-body">
+            <pre id="tab-py"></pre>
+            <pre id="tab-cs" class="hidden"></pre>
+            <pre id="tab-js" class="hidden"></pre>
+            <div id="tab-resp" class="hidden">
+              <div class="tw"><table>
+                <thead><tr><th>err</th><th>含义</th><th>客户端建议处理</th></tr></thead>
+                <tbody id="respBody"></tbody>
+              </table></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+<div id="loginRoot"></div>
+<div id="menuRoot"></div>
+<div id="modalRoot"></div>
+<div id="drawerRoot"></div>
+<script src="/app.js?v=20261108i"></script>
+</body>
+</html>
